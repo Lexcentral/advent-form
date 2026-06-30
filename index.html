@@ -34,15 +34,24 @@
 
     .slot { border: 1px solid #e2e2da; border-radius: 6px; margin-bottom: .75rem; overflow: hidden; }
     .slot summary {
-      padding: .8rem 1rem; cursor: pointer; font-weight: 600; list-style: none;
-      display: flex; align-items: baseline; gap: .5rem;
+      padding: .8rem 1rem; cursor: pointer; list-style: none;
+      display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+      transition: background .12s;
     }
+    .slot summary:hover { background: #eef0f8; }
     .slot summary::-webkit-details-marker { display: none; }
-    .slot summary::before { content: '▸'; color: #999; font-weight: 400; }
-    .slot details[open] summary::before { content: '▾'; }
+    .slot details[open] summary { border-bottom: 1px solid #f0f0ea; }
+    .slot-title { font-weight: 600; }
     .slot .reference { color: #5b6fbf; font-weight: 600; }
+    .toggle-hint {
+      color: #5b6fbf; font-weight: 600; font-size: .9rem; white-space: nowrap;
+      border: 1px solid #cdd3ee; border-radius: 999px; padding: .2rem .6rem; background: #fff;
+    }
+    .when-open { display: none; }
+    .slot details[open] .when-closed { display: none; }
+    .slot details[open] .when-open { display: inline; }
     .passage {
-      padding: .25rem 1rem 1rem 1.9rem; color: #333; line-height: 1.65;
+      padding: .5rem 1rem 1rem; color: #333; line-height: 1.65;
       white-space: pre-wrap; font-size: 1rem;
     }
     .slot-actions { padding: .75rem 1rem; border-top: 1px solid #f0f0ea; background: #fcfcfa; }
@@ -105,8 +114,14 @@
           <div class="slot">
             <details>
               <summary>
-                <span x-text="dateLabel(s)"></span>
-                <span class="reference" x-text="s.passageReference"></span>
+                <span class="slot-title">
+                  <span x-text="dateLabel(s)"></span>
+                  <span class="reference" x-text="s.passageReference"></span>
+                </span>
+                <span class="toggle-hint">
+                  <span class="when-closed">Read scripture ▾</span>
+                  <span class="when-open">Hide ▴</span>
+                </span>
               </summary>
               <div class="passage" x-text="s.passageText || 'Scripture to be announced.'"></div>
             </details>
