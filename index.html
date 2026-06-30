@@ -7,6 +7,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [x-cloak] { display: none !important; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 17px; line-height: 1.5; color: #1a1a1a;
@@ -25,10 +26,6 @@
       font-size: 1.05rem; font-family: inherit; transition: border-color .15s;
     }
     input:focus { outline: none; border-color: #5b6fbf; }
-    .yourinfo { background: #fafaf7; border: 1px solid #e6e6de; border-radius: 6px;
-      padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
-    .status { font-size: .95rem; margin-top: .25rem; min-height: 1.2em; }
-    .status-error { color: #c0392b; }
     .count { color: #666; font-size: .9rem; margin: 0 0 .75rem; }
     .pick-label { font-weight: 600; font-size: 1rem; margin-bottom: .6rem; }
 
@@ -62,6 +59,33 @@
     .signup-btn:hover:not(:disabled) { background: #4a5aaa; }
     .signup-btn:disabled { opacity: .5; cursor: not-allowed; }
 
+    .welcome-banner {
+      background: #eef0f8; border: 1px solid #cdd3ee; border-radius: 6px;
+      padding: .9rem 1.1rem; margin-bottom: 1.25rem;
+    }
+    .welcome-banner strong { color: #4a5aaa; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50;
+    }
+    .modal-card {
+      background: #fff; border-radius: 8px; padding: 1.75rem; width: 100%; max-width: 420px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.25);
+    }
+    .modal-card h2 { font-size: 1.25rem; margin-bottom: .35rem; }
+    .modal-date { color: #5b6fbf; font-weight: 600; margin-bottom: 1.25rem; }
+    .modal-actions { display: flex; gap: .75rem; margin-top: 1.25rem; }
+    .modal-actions .signup-btn { flex: 1; }
+    .btn-secondary {
+      padding: .65rem 1.1rem; background: #fff; color: #444; border: 1px solid #ccc;
+      border-radius: 4px; font-size: 1.02rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-secondary:hover:not(:disabled) { background: #f3f3ef; }
+
+    .status { font-size: .95rem; }
+    .status-error { color: #c0392b; }
     .success-box, .loading-msg, .error-msg { text-align: center; padding: 3rem 1rem; }
     .success-box h2 { font-size: 1.3rem; margin-bottom: .5rem; }
     .success-box p { color: #555; margin-bottom: .35rem; }
@@ -87,26 +111,22 @@
     </div>
 
     <div x-show="ready && !submitted">
+      <template x-if="welcomeName">
+        <div class="welcome-banner">
+          <span x-text="'Welcome, ' + welcomeName + '!'"></span>
+          We're glad you're writing again this year.
+        </div>
+      </template>
+
       <h1>Advent Devotion Signup</h1>
-      <p class="subtitle">Choose a date below to write a short devotion. Tap a date to read its scripture.</p>
+      <p class="subtitle" x-show="!welcomeName">Choose a date below to write a short devotion. Tap a date to read its scripture.</p>
+      <p class="subtitle" x-show="welcomeName">Choose a date below — your name and email are saved, so you'll only confirm.</p>
 
       <div x-show="slots.length === 0" class="notice">
         Every date has been claimed — thank you! Please contact the church office if you'd still like to write.
       </div>
 
       <div x-show="slots.length > 0">
-        <div class="yourinfo">
-          <div class="field" style="margin-bottom:.75rem">
-            <label for="name">Your name</label>
-            <input type="text" id="name" x-model="name" placeholder="First Last">
-          </div>
-          <div class="field" style="margin-bottom:0">
-            <label for="email">Your email</label>
-            <input type="email" id="email" x-model="email" placeholder="you@example.com">
-          </div>
-          <div class="status" :class="{ 'status-error': statusIsError }" x-text="statusMsg"></div>
-        </div>
-
         <p class="count" x-text="slots.length + ' date' + (slots.length === 1 ? '' : 's') + ' still need a writer.'"></p>
         <div class="pick-label">Pick a date:</div>
 
@@ -126,13 +146,38 @@
               <div class="passage" x-text="s.passageText || 'Scripture to be announced.'"></div>
             </details>
             <div class="slot-actions">
-              <button class="signup-btn" @click="signUp(s)" :disabled="!!submittingDate">
-                <span x-show="submittingDate !== s.date">Sign up for this date</span>
-                <span x-show="submittingDate === s.date">Signing up…</span>
-              </button>
+              <button class="signup-btn" @click="openSignup(s)">Sign up for this date</button>
             </div>
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- Sign-up modal -->
+    <div class="modal-overlay" x-cloak x-show="modalOpen"
+         @keydown.escape.window="closeModal()" @click.self="closeModal()">
+      <div class="modal-card">
+        <h2>Sign up</h2>
+        <p class="modal-date" x-text="activeSlot ? slotFullLabel(activeSlot) : ''"></p>
+
+        <div class="field">
+          <label for="m-name">Your name</label>
+          <input type="text" id="m-name" x-ref="mName" x-model="name" placeholder="First Last">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label for="m-email">Your email</label>
+          <input type="email" id="m-email" x-model="email" placeholder="you@example.com">
+        </div>
+
+        <div class="status status-error" x-show="modalError" x-text="modalError" style="margin-top:.6rem"></div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="closeModal()" :disabled="submitting">Cancel</button>
+          <button class="signup-btn" @click="confirmSignup()" :disabled="submitting">
+            <span x-show="!submitting">Confirm sign up</span>
+            <span x-show="submitting">Signing up…</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -146,13 +191,12 @@
     function signupForm() {
       return {
         ready: false, loadError: '',
-        slots: [], name: '', email: '',
-        submitted: false, submittingDate: '',
-        statusMsg: '', statusIsError: false,
-        confirmDate: '', confirmPassage: '',
+        slots: [], name: '', email: '', welcomeName: '',
+        submitted: false, confirmDate: '', confirmPassage: '',
+        modalOpen: false, activeSlot: null, submitting: false, modalError: '',
 
         init() {
-          // Personal link (?token=) pre-fills name/email for returning writers.
+          // Personal link (?token=) pre-fills name/email and greets the writer.
           var token = new URLSearchParams(location.search).get('token') || '';
           var url = GAS_URL + (token ? '?token=' + encodeURIComponent(token) : '');
           fetch(url, { redirect: 'follow' })
@@ -160,7 +204,11 @@
             .then(function(data) {
               if (data.error) throw new Error(data.error);
               this.slots = data.slots || [];
-              if (data.writer) { this.name = data.writer.name || ''; this.email = data.writer.email || ''; }
+              if (data.writer) {
+                this.name  = data.writer.name  || '';
+                this.email = data.writer.email || '';
+                this.welcomeName = (this.name.split(' ')[0] || '').trim();
+              }
               this.ready = true;
             }.bind(this))
             .catch(function() {
@@ -173,36 +221,47 @@
           var p = s.date.split('-').map(Number);
           return (s.weekday ? s.weekday + ', ' : '') + MONTHS[p[1] - 1] + ' ' + p[2] + ' —';
         },
+        // "Sun, Nov 29 — Jeremiah 33:14-16" (full, for the modal header).
+        slotFullLabel: function(s) {
+          var p = s.date.split('-').map(Number);
+          var d = (s.weekday ? s.weekday + ', ' : '') + MONTHS[p[1] - 1] + ' ' + p[2];
+          return s.passageReference ? d + ' — ' + s.passageReference : d;
+        },
 
-        async signUp(slot) {
-          if (!this.name.trim() || !this.email.trim()) {
-            this.fail('Please enter your name and email above first.');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            return;
-          }
-          this.submittingDate = slot.date;
-          this.statusMsg = ''; this.statusIsError = false;
+        openSignup(slot) {
+          this.activeSlot = slot;
+          this.modalError = '';
+          this.modalOpen = true;
+          this.$nextTick(function() {
+            if (!this.name.trim() && this.$refs.mName) this.$refs.mName.focus();
+          }.bind(this));
+        },
+        closeModal() { if (!this.submitting) this.modalOpen = false; },
+
+        async confirmSignup() {
+          if (!this.name.trim() || !this.email.trim()) { this.modalError = 'Please enter your name and email.'; return; }
+          if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(this.email.trim())) { this.modalError = 'Please enter a valid email address.'; return; }
+          this.submitting = true; this.modalError = '';
           try {
             // text/plain avoids a CORS preflight; GAS reads e.postData.contents.
             var r = await fetch(GAS_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ route: 'signup', date: slot.date, name: this.name.trim(), email: this.email.trim() }),
+              body: JSON.stringify({ route: 'signup', date: this.activeSlot.date, name: this.name.trim(), email: this.email.trim() }),
               redirect: 'follow'
             });
             var data = await r.json();
             if (data.error) throw new Error(data.error);
             this.confirmDate = data.dateLabel || '';
             this.confirmPassage = data.passageReference || '';
+            this.modalOpen = false;
             this.submitted = true;
           } catch (err) {
-            this.fail(err.message);
+            this.modalError = err.message;
           } finally {
-            this.submittingDate = '';
+            this.submitting = false;
           }
-        },
-
-        fail: function(msg) { this.statusMsg = msg; this.statusIsError = true; }
+        }
       };
     }
   </script>
