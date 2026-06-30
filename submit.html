@@ -107,11 +107,6 @@
       </template>
 
       <div class="field">
-        <label for="title">Title</label>
-        <input type="text" id="title" x-model="title" placeholder="A short title for your devotion">
-      </div>
-
-      <div class="field">
         <label>Devotion</label>
         <div class="editor-wrap"><div id="body-editor"></div></div>
       </div>
@@ -149,7 +144,7 @@
       return {
         ready: false, loadError: '',
         token: '', writer: null, assignments: [], selectedDate: '', active: null,
-        title: '', bio: '',
+        bio: '',
         bodyQuill: null, prayerQuill: null,
         submitted: false, submitting: false, statusMsg: '', statusIsError: false, confirmDate: '',
 
@@ -201,7 +196,6 @@
 
         async submit() {
           if (!this.token && !this.selectedDate) { this.fail('Please select your name and date.'); return; }
-          if (!this.title.trim()) { this.fail('Please enter a title.'); return; }
           var body = this.bodyQuill.root.innerHTML;
           if (!body.trim() || body === '<p><br></p>') { this.fail('Please write your devotion before submitting.'); return; }
           var prayer = this.prayerQuill.root.innerHTML;
@@ -215,7 +209,7 @@
               headers: { 'Content-Type': 'text/plain;charset=utf-8' },
               body: JSON.stringify({
                 route: 'submit', token: this.token, date: this.selectedDate,
-                title: this.title.trim(), body: body, prayer: prayer, bio: this.bio.trim()
+                body: body, prayer: prayer, bio: this.bio.trim()
               }),
               redirect: 'follow'
             });
