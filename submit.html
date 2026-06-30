@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Submit Your Advent Devotion — LexCentral</title>
+  <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [x-cloak] { display: none !important; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 17px; line-height: 1.5; color: #1a1a1a;
+      background: #f5f5f0; min-height: 100vh; padding: 2rem 1rem;
+    }
+    .card { max-width: 680px; margin: 0 auto; background: #fff; border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.12); padding: 2rem 2.5rem; }
+    h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: .25rem; }
+    .subtitle { color: #666; font-size: .95rem; margin-bottom: 1.5rem; }
+    .field { margin-bottom: 1.25rem; }
+    label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: .4rem; }
+    .hint { font-weight: 400; color: #888; font-size: .85rem; }
+    input[type="text"], select, textarea {
+      width: 100%; padding: .6rem .75rem; border: 1px solid #ccc; border-radius: 4px;
+      font-size: 1.05rem; font-family: inherit; transition: border-color .15s;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #5b6fbf; }
+    .assignment {
+      background: #eef0f8; border: 1px solid #cdd3ee; border-radius: 6px;
+      padding: .9rem 1.1rem; margin-bottom: 1.25rem;
+    }
+    .assignment .ref { color: #4a5aaa; font-weight: 600; }
+    details.scripture { margin-top: .5rem; }
+    details.scripture summary { cursor: pointer; color: #5b6fbf; font-weight: 600; font-size: .9rem; }
+    details.scripture .passage { white-space: pre-wrap; line-height: 1.6; margin-top: .5rem; color: #333; font-size: .98rem; }
+    .editor-wrap { border: 1px solid #ccc; border-radius: 4px; overflow: hidden; }
+    .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid #ccc; }
+    .ql-container.ql-snow { border: none; font-size: 1.05rem; }
+    #body-editor { min-height: 240px; }
+    #prayer-editor { min-height: 110px; }
+    .actions { margin-top: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    button[type="submit"] { padding: .7rem 1.6rem; background: #5b6fbf; color: #fff; border: none;
+      border-radius: 4px; font-size: 1.05rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+    button[type="submit"]:hover:not(:disabled) { background: #4a5aaa; }
+    button[type="submit"]:disabled { opacity: .5; cursor: not-allowed; }
+    .status { font-size: .95rem; }
+    .status-error { color: #c0392b; }
+    .success-box, .loading-msg, .error-msg { text-align: center; padding: 3rem 1rem; }
+    .success-box h2 { font-size: 1.3rem; margin-bottom: .5rem; }
+    .success-box p { color: #555; margin-bottom: .35rem; }
+    .loading-msg { color: #666; }
+    .error-msg { color: #c0392b; }
+    .notice { background: #fff8e1; border: 1px solid #f0c040; border-radius: 4px;
+      padding: .75rem 1rem; font-size: .95rem; margin-bottom: 1.25rem; }
+  </style>
+</head>
+<body>
+  <div class="card" x-data="submitForm()">
+
+    <div x-show="!ready && !loadError" class="loading-msg">Loading…</div>
+    <div x-show="!!loadError" class="error-msg" x-text="loadError"></div>
+
+    <div x-show="submitted" class="success-box">
+      <h2>Devotion received — thank you!</h2>
+      <p x-text="confirmDate"></p>
+      <p style="margin-top:1rem">Your devotion has been sent for editing. You'll hear from us if anything is needed.</p>
+    </div>
+
+    <div x-show="ready && !submitted" x-cloak>
+      <h1>Submit Your Advent Devotion</h1>
+      <p class="subtitle">Write your devotion below. You can save your place by keeping this page open until you submit.</p>
+
+      <!-- Identity: from token, or pick from the dropdown -->
+      <template x-if="writer">
+        <div class="assignment">
+          Writing as <strong x-text="writer.name"></strong> for <strong x-text="longDate(writer.date)"></strong>
+          <div class="ref" x-text="writer.passageReference"></div>
+          <details class="scripture" x-show="writer.passageText">
+            <summary>Read the scripture</summary>
+            <div class="passage" x-text="writer.passageText"></div>
+          </details>
+        </div>
+      </template>
+
+      <template x-if="!writer">
+        <div class="field">
+          <label for="who">Your name &amp; date <span class="hint">(or use the personal link from your email)</span></label>
+          <select id="who" x-model="selectedDate" @change="onPick()">
+            <option value="">— select your name and date —</option>
+            <template x-for="a in assignments" :key="a.date">
+              <option :value="a.date" x-text="a.name + ' — ' + longDate(a.date)"></option>
+            </template>
+          </select>
+          <template x-if="active">
+            <div class="assignment" style="margin-top:.75rem">
+              <div class="ref" x-text="active.passageReference"></div>
+              <details class="scripture" x-show="active.passageText">
+                <summary>Read the scripture</summary>
+                <div class="passage" x-text="active.passageText"></div>
+              </details>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <div class="field">
+        <label for="title">Title</label>
+        <input type="text" id="title" x-model="title" placeholder="A short title for your devotion">
+      </div>
+
+      <div class="field">
+        <label>Devotion</label>
+        <div class="editor-wrap"><div id="body-editor"></div></div>
+      </div>
+
+      <div class="field">
+        <label>Prayer <span class="hint">(optional)</span></label>
+        <div class="editor-wrap"><div id="prayer-editor"></div></div>
+      </div>
+
+      <div class="field">
+        <label for="bio">About you <span class="hint">(optional — a sentence or two)</span></label>
+        <textarea id="bio" x-model="bio" placeholder="e.g. Jane is a longtime member who enjoys gardening and her grandchildren."></textarea>
+      </div>
+
+      <div class="actions">
+        <button type="submit" @click="submit()" :disabled="submitting">
+          <span x-show="!submitting">Submit devotion</span>
+          <span x-show="submitting">Submitting…</span>
+        </button>
+        <span class="status" :class="{ 'status-error': statusIsError }" x-text="statusMsg"></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var GAS_URL = 'https://script.google.com/macros/s/AKfycbxFoosfdzDr6mhZT70RjkvspKP9pF9XkuFdoISb1sKpyk2Bv0g5rIHm3FucyyQHx1Xs/exec';
+
+    function longDate(s) {
+      var p = s.split('-').map(Number);
+      return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString('en-US',
+        { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    function submitForm() {
+      return {
+        ready: false, loadError: '',
+        token: '', writer: null, assignments: [], selectedDate: '', active: null,
+        title: '', bio: '',
+        bodyQuill: null, prayerQuill: null,
+        submitted: false, submitting: false, statusMsg: '', statusIsError: false, confirmDate: '',
+
+        init() {
+          this.token = new URLSearchParams(location.search).get('token') || '';
+          var url = GAS_URL + '?route=submit' + (this.token ? '&token=' + encodeURIComponent(this.token) : '');
+          fetch(url, { redirect: 'follow' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (data.error) throw new Error(data.error);
+              this.writer = data.writer || null;
+              this.assignments = data.assignments || [];
+              if (this.writer) this.active = this.writer;
+              this.ready = true;
+              this.$nextTick(this.initEditors.bind(this));
+            }.bind(this))
+            .catch(function() {
+              this.loadError = 'Could not load the form. Please use the link from your email or contact the church office.';
+            }.bind(this));
+        },
+
+        initEditors() {
+          var Delta = Quill.import('delta');
+          var underlineMatcher = function(node, delta) {
+            var style = (node.getAttribute && node.getAttribute('style')) || '';
+            if ((node.tagName === 'U' || style.toLowerCase().includes('underline')) && delta.length()) {
+              return delta.compose(new Delta().retain(delta.length(), { underline: true }));
+            }
+            return delta;
+          };
+          this.bodyQuill = new Quill('#body-editor', {
+            theme: 'snow', placeholder: 'Write your devotion here…',
+            modules: { toolbar: [['bold', 'italic', 'underline'], [{ header: [2, 3, false] }],
+              [{ list: 'ordered' }, { list: 'bullet' }], ['clean']] }
+          });
+          this.prayerQuill = new Quill('#prayer-editor', {
+            theme: 'snow', placeholder: 'A closing prayer (optional)…',
+            modules: { toolbar: [['bold', 'italic'], ['clean']] }
+          });
+          this.bodyQuill.clipboard.addMatcher(Node.ELEMENT_NODE, underlineMatcher);
+          this.prayerQuill.clipboard.addMatcher(Node.ELEMENT_NODE, underlineMatcher);
+        },
+
+        onPick() {
+          this.active = this.assignments.find(function(a) { return a.date === this.selectedDate; }.bind(this)) || null;
+        },
+
+        fail: function(msg) { this.statusMsg = msg; this.statusIsError = true; },
+
+        async submit() {
+          if (!this.token && !this.selectedDate) { this.fail('Please select your name and date.'); return; }
+          if (!this.title.trim()) { this.fail('Please enter a title.'); return; }
+          var body = this.bodyQuill.root.innerHTML;
+          if (!body.trim() || body === '<p><br></p>') { this.fail('Please write your devotion before submitting.'); return; }
+          var prayer = this.prayerQuill.root.innerHTML;
+          if (prayer === '<p><br></p>') prayer = '';
+
+          this.submitting = true; this.statusMsg = ''; this.statusIsError = false;
+          try {
+            // text/plain avoids a CORS preflight; GAS reads e.postData.contents.
+            var r = await fetch(GAS_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({
+                route: 'submit', token: this.token, date: this.selectedDate,
+                title: this.title.trim(), body: body, prayer: prayer, bio: this.bio.trim()
+              }),
+              redirect: 'follow'
+            });
+            var data = await r.json();
+            if (data.error) throw new Error(data.error);
+            this.confirmDate = data.dateLabel || '';
+            this.submitted = true;
+          } catch (err) {
+            this.fail(err.message);
+          } finally {
+            this.submitting = false;
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>
